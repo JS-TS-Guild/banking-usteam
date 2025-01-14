@@ -24,6 +24,9 @@ class Bank {
   }
 
   createAccount(balance: number) {
+    if (!this.isNegativeAllowed && balance < 0) {
+      throw new Error("Positive Bank cannot have negative balance");
+    }
     const account: BankAccount = BankAccount.create(this.bankId, balance);
     return account;
   }
@@ -36,7 +39,7 @@ class Bank {
     senderId: UserId,
     receiverId: UserId,
     amount: number,
-    receiverBankId?: BankId
+    receiverBankId: BankId = this.bankId
   ) {
     // this.id  // senderBankId
     // this.isNegativeAllowed // senderBankId option
@@ -68,19 +71,16 @@ class Bank {
     const receiverBankAccountIds: BankAccountId[] =
       User.getBankAccountsFromUserId(receiverId);
     let receiverBankAccount: BankAccount;
-    if (receiverBankId) {
-      for (const bankAccountId of receiverBankAccountIds) {
-        const bankAccount =
-          BankAccount.getAccountFromBankAccountId(bankAccountId);
-        if (bankAccount.bankId == receiverBankId) {
-          receiverBankAccount = bankAccount;
-          break;
+    for (const bankAccountId of receiverBankAccountIds) {
+      const bankAccount =
+        BankAccount.getAccountFromBankAccountId(bankAccountId);
+      if (bankAccount.bankId == receiverBankId) {
+        if (senderId == receiverId && senderBankAccount.getId() == bankAccount.getId()) {
+          continue;
         }
+        receiverBankAccount = bankAccount;
+        break;
       }
-    } else {
-      receiverBankAccount = BankAccount.getAccountFromBankAccountId(
-        receiverBankAccountIds[0]
-      );
     }
 
     // sending the money
