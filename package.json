@@ -14,10 +14,15 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/node": "^22.10.5",
     "vite-tsconfig-paths": "^5.0.1",
     "vitest": "^2.1.0"
   },
   "dependencies": {
+    "module-alias": "^2.2.3",
     "uuid": "^11.0.5"
+  },
+  "_moduleAliases": {
+    "@": "./src"
   }
 }
