@@ -2,37 +2,52 @@ import BankAccount from "@/models/bank-account";
 import TransactionService from "@/services/TransactionService";
 import { BankAccountId, BankId, UserId } from "@/types/Common";
 import User from "@/models/user";
+import { v4 as uuidv4 } from "uuid";
+import GlobalRegistry from "@/services/GlobalRegistry";
+import { aK } from "vitest/dist/chunks/reporters.D7Jzd9GS";
 
 class Bank {
   bankId: BankId;
-  // name: string;
+  accounts: Map<BankAccountId, BankAccount>;
   isNegativeAllowed: boolean;
 
-  constructor(options?: { isNegativeAllowed?: boolean }) {
-    // this.name = name
-    this.bankId = crypto.randomUUID();
-    this.isNegativeAllowed = options ? options.isNegativeAllowed : false;
+  constructor(id: BankId, isNegativeAllowed: boolean = false) {
+    this.bankId = id
+    this.accounts = new Map();
+    this.isNegativeAllowed = isNegativeAllowed;
   }
 
   static create(options?: { isNegativeAllowed?: boolean }): Bank {
-    const bank: Bank = new Bank(options);
+    const bank: Bank = new this(uuidv4(), options?.isNegativeAllowed || false);
+    GlobalRegistry.registerBank(bank);
     return bank;
   }
 
-  getId() {
+  getId(): BankId {
     return this.bankId;
   }
 
-  createAccount(balance: number) {
-    if (!this.isNegativeAllowed && balance < 0) {
-      throw new Error("Positive Bank cannot have negative balance");
-    }
-    const account: BankAccount = BankAccount.create(this.bankId, balance);
+  createAccount(initialBalance: number): BankAccount {
+    const account = BankAccount.create(initialBalance, this.bankId);
+    this.accounts.set(account.getId(), account);
     return account;
   }
 
-  getAccount(bankAccountId: BankAccountId) {
-    return BankAccount.getAccountFromBankAccountId(bankAccountId);
+  getAccount(accountId: BankAccountId): BankAccount {
+    const account =
+      this.accounts.get(accountId) || GlobalRegistry.getAccount(accountId);
+    if (!account) {
+      throw new Error("Account not found");
+    }
+    return account;
+  }
+
+  getIsNegativeAllowed(): boolean {
+    return this.isNegativeAllowed;
+  }
+
+  hasAccount(accountId: string): boolean {
+    return this.accounts.has(accountId);
   }
 
   send(
@@ -40,53 +55,52 @@ class Bank {
     receiverId: UserId,
     amount: number,
     receiverBankId: BankId = this.bankId
-  ) {
-    // this.id  // senderBankId
-    // this.isNegativeAllowed // senderBankId option
+  ): void {
+    const senderUser = GlobalRegistry.GetUser(senderId);
+    const recieverUser = GlobalRegistry.GetUser(receiverId);
 
-    // sender bank account
-    const senderBankAccountIds: BankAccountId[] =
-      User.getBankAccountsFromUserId(senderId);
-    // select the bank account from the bank where this method is called
-    let senderBankAccount: BankAccount;
-    for (const bankAccountId of senderBankAccountIds) {
-      const bankAccount =
-        BankAccount.getAccountFromBankAccountId(bankAccountId);
-      if (bankAccount.bankId == this.bankId) {
-        if (!this.isNegativeAllowed && bankAccount.balance >= amount) {
-          senderBankAccount = bankAccount;
-          break;
-        } else if (this.isNegativeAllowed) {
-          senderBankAccount = bankAccount;
-          break;
-        }
+    const senderAccountIds = senderUser.getAccountIds()
+    const senderAccounts = [];
+    for (const senderAccountId of senderAccountIds) {
+      const account = this.accounts.get(senderAccountId);
+      if (account !== undefined) {
+        senderAccounts.push(account);
       }
     }
 
-    if (!senderBankAccount) {
+    let totalBalance = 0;
+    for (const account of senderAccounts) {
+      totalBalance += account.getBalance();
+    }
+
+    if (!this.isNegativeAllowed && totalBalance < amount) {
       throw new Error("Insufficient funds");
     }
 
-    // reciever bank account
-    const receiverBankAccountIds: BankAccountId[] =
-      User.getBankAccountsFromUserId(receiverId);
-    let receiverBankAccount: BankAccount;
-    for (const bankAccountId of receiverBankAccountIds) {
-      const bankAccount =
-        BankAccount.getAccountFromBankAccountId(bankAccountId);
-      if (bankAccount.bankId == receiverBankId) {
-        if (senderId == receiverId && senderBankAccount.getId() == bankAccount.getId()) {
-          continue;
-        }
-        receiverBankAccount = bankAccount;
-        break;
+    let receiverAccount: BankAccount;
+    if (receiverBankId && receiverBankId !== this.bankId) {
+      const receiverBank = GlobalRegistry.getBank(receiverBankId);
+      const receiverAccountId = recieverUser
+      .getAccountIds()
+      .find((id) => receiverBank.accounts.has(id));
+      if (!receiverAccountId) {
+        throw new Error("Account not found");
       }
+      receiverAccount = receiverBank.getAccount(receiverAccountId);
+    } else {
+      const receiverAccountId = recieverUser
+      .getAccountIds()
+      .find((id) => this.accounts.has(id));
+      if (!receiverAccountId) {
+        throw new Error("Account not found")
+      }
+      receiverAccount = this.getAccount(receiverAccountId);
     }
 
     // sending the money
     TransactionService.send(
-      senderBankAccount,
-      receiverBankAccount,
+      senderAccounts,
+      receiverAccount,
       amount,
       this.isNegativeAllowed
     );

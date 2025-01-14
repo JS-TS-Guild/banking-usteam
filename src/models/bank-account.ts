@@ -1,33 +1,46 @@
+import GlobalRegistry from "@/services/GlobalRegistry";
 import { BankAccountId, BankId } from "@/types/Common";
+import { v4 as uuidv4 } from "uuid";
 
 class BankAccount {
-  bankAccountId: string;
+  bankAccountId: BankAccountId;
   bankId: BankId;
   balance: number;
-  private static accountIdMap: Map<BankAccountId, BankAccount> = new Map();
 
-  constructor(bankId: BankId, balance: number) {
-    this.bankAccountId = crypto.randomUUID();
+  constructor(bankAccountId: BankAccountId, bankId: BankId, balance: number) {
+    this.bankAccountId = bankAccountId;
     this.bankId = bankId;
     this.balance = balance;
   }
 
-  static create(bankId: BankId, balance: number) {
-    const bankAccount = new BankAccount(bankId, balance);
-    BankAccount.accountIdMap.set(bankAccount.getId(), bankAccount);
+  static create(balance: number, bankId: BankId): BankAccount {
+    const bankAccount = new this(uuidv4(), bankId, balance);
+    GlobalRegistry.registerAccount(bankAccount);
     return bankAccount;
   }
 
-  getId() {
+  getId(): BankAccountId {
     return this.bankAccountId;
   }
 
-  getBalance() {
+  getBalance(): number {
     return this.balance;
   }
 
-  static getAccountFromBankAccountId(bankAccountId: BankAccountId) {
-    return BankAccount.accountIdMap.get(bankAccountId);
+  getBankId(): BankId {
+    return this.bankId;
+  }
+
+  setBalance(amount: number): void {
+    this.balance = amount;
+  }
+
+  deposit(amount: number): void {
+    this.balance += amount
+  }
+
+  withdraw(amount: number): void {
+    this.balance -= amount
   }
 }
 

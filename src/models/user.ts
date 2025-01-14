@@ -1,20 +1,21 @@
+import GlobalRegistry from "@/services/GlobalRegistry";
 import { BankAccountId, UserId } from "@/types/Common";
+import {v4 as uuidv4} from "uuid";
 
 class User {
   userId: UserId;
   name: string;
   accountsIdArr: BankAccountId[];
-  static userIdBankAccountIdMap: Map<UserId, BankAccountId[]> = new Map();
 
-  constructor(name: string, accountsIdArr: BankAccountId[]) {
-    this.userId = crypto.randomUUID(); // userId
+  constructor(id: UserId, name: string, accountsIdArr: BankAccountId[]) {
+    this.userId = id
     this.name = name;
     this.accountsIdArr = accountsIdArr;
-    User.userIdBankAccountIdMap.set(this.userId, accountsIdArr);
   }
 
-  static create(name: string, accountsIdArr: BankAccountId[]) {
-    const user: User = new User(name, accountsIdArr);
+  static create(name: string, accountsIdArr: BankAccountId[]): User {
+    const user: User = new this(uuidv4(), name, accountsIdArr);
+    GlobalRegistry.registerUser(user);
     return user;
   }
 
@@ -22,8 +23,12 @@ class User {
     return this.userId;
   }
 
-  static getBankAccountsFromUserId(userId: UserId) {
-    return User.userIdBankAccountIdMap.get(userId);
+  getName(): string {
+    return this.name;
+  }
+
+  getAccountIds(): BankAccountId[] {
+    return this.accountsIdArr;
   }
 }
 
