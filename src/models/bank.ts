@@ -50,10 +50,20 @@ class Bank {
       const bankAccount =
         BankAccount.getAccountFromBankAccountId(bankAccountId);
       if (bankAccount.bankId == this.bankId) {
-        senderBankAccount = bankAccount;
-        break;
+        if (!this.isNegativeAllowed && bankAccount.balance >= amount) {
+          senderBankAccount = bankAccount;
+          break;
+        } else if (this.isNegativeAllowed) {
+          senderBankAccount = bankAccount;
+          break;
+        }
       }
     }
+
+    if (!senderBankAccount) {
+      throw new Error("Insufficient funds");
+    }
+
     // reciever bank account
     const receiverBankAccountIds: BankAccountId[] =
       User.getBankAccountsFromUserId(receiverId);
@@ -72,10 +82,27 @@ class Bank {
         receiverBankAccountIds[0]
       );
     }
-    
+
     // sending the money
-    TransactionService.send(senderBankAccount, receiverBankAccount, amount, this.isNegativeAllowed);
+    TransactionService.send(
+      senderBankAccount,
+      receiverBankAccount,
+      amount,
+      this.isNegativeAllowed
+    );
   }
 }
 
 export default Bank;
+
+// const bank = Bank.create();
+// const johnAccount = bank.createAccount(1000);
+// console.log("initial johnbalance-0", johnAccount.balance);
+// const johnAccount1 = bank.createAccount(1200);
+// console.log("initial johnbalance-1", johnAccount.balance);
+// const jayAccount = bank.createAccount(100);
+
+// const john = User.create("John", [johnAccount.getId(), johnAccount1.getId()]);
+// const jay = User.create("Jay", [jayAccount.getId()]);
+
+// bank.send(john.getId(), jay.getId(), 1100);
